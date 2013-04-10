@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-# -*- coding: UTF-8 -*-
+# -*- encoding: utf-8 -*-
 
 import cPickle
 from cStringIO import StringIO
@@ -11,12 +11,13 @@ import sys
 
 from _line_profiler import LineProfiler as CLineProfiler
 
-
 CO_GENERATOR = 0x0020
+
+
 def is_generator(f):
     """ Return True if a function is a generator.
     """
-    isgen = (f.func_code.co_flags & CO_GENERATOR) != 0 
+    isgen = (f.func_code.co_flags & CO_GENERATOR) != 0
     return isgen
 
 # Code to exec inside of LineProfiler.__call__ to support PEP-342-style
@@ -45,13 +46,14 @@ def wrap_generator(self, func):
     return f
 '''
 
+
 class LineProfiler(CLineProfiler):
     """ A profiler that records the execution times of individual lines.
     """
 
     def __call__(self, func):
-        """ Decorate a function to start the profiler on function entry and stop
-        it on function exit.
+        """ Decorate a function to start the profiler on function entry and
+        stop it on function exit.
         """
         self.add_function(func)
         if is_generator(func):
@@ -64,7 +66,7 @@ class LineProfiler(CLineProfiler):
         f.__dict__.update(getattr(func, '__dict__', {}))
         return f
 
-    if sys.version_info[:2] >= (2,5):
+    if sys.version_info[:2] >= (2, 5):
         # Delay compilation because the syntax is not compatible with older
         # Python versions.
         exec pep342_gen_wrapper
@@ -165,13 +167,13 @@ def show_func(filename, start_lineno, func_name, timings, unit, stream=None):
         sublines = [''] * nlines
     else:
         all_lines = linecache.getlines(filename)
-        sublines = inspect.getblock(all_lines[start_lineno-1:])
+        sublines = inspect.getblock(all_lines[start_lineno - 1:])
     for lineno, nhits, time in timings:
         d[lineno] = (nhits, time, '%5.1f' % (float(time) / nhits),
-            '%5.1f' % (100*time / total_time))
+            '%5.1f' % (100 * time / total_time))
     linenos = range(start_lineno, start_lineno + len(sublines))
     empty = ('', '', '', '')
-    header = template % ('Line #', 'Hits', 'Time', 'Per Hit', '% Time', 
+    header = template % ('Line #', 'Hits', 'Time', 'Per Hit', '% Time',
         'Line Contents')
     print >>stream, ""
     print >>stream, header
@@ -182,6 +184,7 @@ def show_func(filename, start_lineno, func_name, timings, unit, stream=None):
             line.rstrip('\n').rstrip('\r'))
     print >>stream, ""
 
+
 def show_text(stats, unit, stream=None):
     """ Show text for the given timings.
     """
@@ -190,7 +193,9 @@ def show_text(stats, unit, stream=None):
     print >>stream, 'Timer unit: %g s' % unit
     print >>stream, ''
     for (fn, lineno, name), timings in sorted(stats.items()):
-        show_func(fn, lineno, name, stats[fn, lineno, name], unit, stream=stream)
+        show_func(fn, lineno, name, stats[fn, lineno, name],
+                  unit, stream=stream)
+
 
 # A %lprun magic for IPython.
 def magic_lprun(self, parameter_s=''):
@@ -206,7 +211,7 @@ def magic_lprun(self, parameter_s=''):
     pager once the statement has completed.
 
     Options:
-    
+
     -f <function>: LineProfiler only profiles functions and methods it is told
     to profile.  This option tells the profiler about these functions. Multiple
     -f options may be used. The argument may be any expression that gives
@@ -233,7 +238,7 @@ def magic_lprun(self, parameter_s=''):
 
     # Escape quote markers.
     opts_def = Struct(D=[''], T=[''], f=[])
-    parameter_s = parameter_s.replace('"',r'\"').replace("'",r"\'")
+    parameter_s = parameter_s.replace('"', r'\"').replace("'", r"\'")
     opts, arg_str = self.parse_options(parameter_s, 'rf:D:T:', list_all=True)
     opts.merge(opts_def)
 
@@ -246,7 +251,7 @@ def magic_lprun(self, parameter_s=''):
         try:
             funcs.append(eval(name, global_ns, local_ns))
         except Exception, e:
-            raise UsageError('Could not find function %r.\n%s: %s' % (name, 
+            raise UsageError('Could not find function %r.\n%s: %s' % (name,
                 e.__class__.__name__, e))
 
     profile = LineProfiler(*funcs)
@@ -287,7 +292,7 @@ def magic_lprun(self, parameter_s=''):
     if dump_file:
         profile.dump_stats(dump_file)
         print '\n*** Profile stats pickled to file',\
-              `dump_file`+'.',message
+              repr(dump_file) + '.', message
 
     text_file = opts.T[0]
     if text_file:
@@ -295,13 +300,14 @@ def magic_lprun(self, parameter_s=''):
         pfile.write(output)
         pfile.close()
         print '\n*** Profile printout saved to text file',\
-              `text_file`+'.',message
+              repr(text_file) + '.', message
 
     return_value = None
     if opts.has_key('r'):
         return_value = profile
 
     return return_value
+
 
 def load_stats(filename):
     """ Utility function to load a pickled LineStats object from a given
