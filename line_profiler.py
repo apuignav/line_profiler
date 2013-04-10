@@ -8,6 +8,7 @@ import linecache
 import optparse
 import os
 import sys
+import math
 
 from _line_profiler import LineProfiler as CLineProfiler
 
@@ -141,14 +142,32 @@ class LineProfiler(CLineProfiler):
             self.disable_by_count()
 
 
-def show_func(filename, start_lineno, func_name, timings, unit, stream=None):
+def format_time(time, unit, human_readable=False):
+    units = {0: "s ", 3: "ms", 6: "us", 9: "ns"}
+    base_exponent = int(-math.log10(unit + 1e-12) / 3 + 1) * 3
+    base_unit = unit / 10 ** (-base_exponent)
+
+    if human_readable:
+        time *= base_unit
+        current_exponent = base_exponent
+        while time >= 1000 and current_exponent > 0:
+            current_exponent -= 3
+            time /= 1000.
+        value = "%.2f %s" % (time, units[current_exponent])
+    else:
+        value = "%5.1f" % time
+    return value
+
+
+def show_func(filename, start_lineno, func_name, timings, unit,
+              stream=None, human_readable=False):
     """ Show results for a single function.
     """
     if stream is None:
         stream = sys.stdout
     print >>stream, "File: %s" % filename
     print >>stream, "Function: %s at line %s" % (func_name, start_lineno)
-    template = '%6s %9s %12s %8s %8s  %-s'
+    template = '%6s %9s %13s %10s %8s  %-s'
     d = {}
     total_time = 0.0
     linenos = []
@@ -169,8 +188,10 @@ def show_func(filename, start_lineno, func_name, timings, unit, stream=None):
         all_lines = linecache.getlines(filename)
         sublines = inspect.getblock(all_lines[start_lineno - 1:])
     for lineno, nhits, time in timings:
-        d[lineno] = (nhits, time, '%5.1f' % (float(time) / nhits),
-            '%5.1f' % (100 * time / total_time))
+        d[lineno] = (nhits,
+                     format_time(time, unit, human_readable=human_readable),
+                     format_time(float(time) / nhits, unit, human_readable=human_readable),
+                     '%5.1f' % (100 * time / total_time))
     linenos = range(start_lineno, start_lineno + len(sublines))
     empty = ('', '', '', '')
     header = template % ('Line #', 'Hits', 'Time', 'Per Hit', '% Time',
@@ -185,7 +206,7 @@ def show_func(filename, start_lineno, func_name, timings, unit, stream=None):
     print >>stream, ""
 
 
-def show_text(stats, unit, stream=None):
+def show_text(stats, unit, stream=None, human_readable=False):
     """ Show text for the given timings.
     """
     if stream is None:
@@ -194,7 +215,7 @@ def show_text(stats, unit, stream=None):
     print >>stream, ''
     for (fn, lineno, name), timings in sorted(stats.items()):
         show_func(fn, lineno, name, stats[fn, lineno, name],
-                  unit, stream=stream)
+                  unit, stream=stream, human_readable=human_readable)
 
 
 # A %lprun magic for IPython.
@@ -324,12 +345,16 @@ def load_stats(filename):
 def main():
     usage = "usage: %prog profile.lprof"
     parser = optparse.OptionParser(usage=usage, version='%prog 1.0b2')
-
+    parser.add_option("--human-readable", "-H", dest="human_readable",
+                      default=False, action="store_true",
+                      help="print execution times in easy to read format")
     options, args = parser.parse_args()
     if len(args) != 1:
         parser.error("Must provide a filename.")
     lstats = load_stats(args[0])
-    show_text(lstats.timings, lstats.unit)
+    show_text(lstats.timings, lstats.unit,
+              human_readable=options.human_readable)
+
 
 if __name__ == '__main__':
     main()
