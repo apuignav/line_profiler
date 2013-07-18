@@ -159,6 +159,66 @@ def format_time(time, unit, human_readable=False):
     return value
 
 
+def show_func_html(filename, start_lineno, func_name, timings, unit,
+                   stream=None, human_readable=False):
+    """ Show results for a single function.
+    """
+    if stream is None:
+        stream = sys.stdout
+
+    # Output header
+    print >>stream, ("<h2>%s()</h2>" % func_name)
+    print >>stream, "<p>File: %s:%s</p>" % (filename, start_lineno)
+
+    d = {}
+    total_time = 0.0
+    linenos = []
+    for lineno, nhits, time in timings:
+        total_time += time
+        linenos.append(lineno)
+    print >>stream, "<p>Total time: %g s</p>" % (total_time * unit)
+
+    if not os.path.exists(filename):
+        raise ValueError("Source file not found: %s" % filename)
+    else:
+        all_lines = linecache.getlines(filename)
+        sublines = inspect.getblock(all_lines[start_lineno - 1:])
+    for lineno, nhits, time in timings:
+        d[lineno] = (nhits,
+                     format_time(time, unit, human_readable=human_readable),
+                     format_time(float(time) / nhits, unit,
+                                 human_readable=human_readable),
+                     '%5.1f' % (100 * time / total_time))
+    linenos = range(start_lineno, start_lineno + len(sublines))
+    empty = ('', '', '', '')
+
+    # Output timing data
+    print >>stream, "<pre>"
+    template = '%6s %9s %13s %10s %8s  %-s'
+    header = template % ('Line #', 'Hits', 'Time', 'Per Hit', '% Time',
+        'Line Contents')
+    line_template = '<span class="%s">' + template + '</span>'
+    print >>stream, header
+    print >>stream, '=' * len(header)
+    for lineno, line in zip(linenos, sublines):
+        nhits, time, per_hit, percent = d.get(lineno, empty)
+        print >>stream, line_template % (percentage_to_class(percent),
+                                         lineno, nhits, time, per_hit, percent,
+                                         line.rstrip('\n').rstrip('\r'))
+    print >>stream, "</pre>"
+
+
+def percentage_to_class(percentage):
+    if len(percentage.strip(" \t")) == 0:
+        return "blank"
+    p = float(percentage) / 100.
+    k = 3.
+    category = int(math.ceil((20. * p * (p - k) / (1 - k))))
+    if category > 10:
+        category = 10
+    return "p%d" % category
+
+
 def show_func(filename, start_lineno, func_name, timings, unit,
               stream=None, human_readable=False):
     """ Show results for a single function.
@@ -217,6 +277,42 @@ def show_text(stats, unit, stream=None, human_readable=False):
         show_func(fn, lineno, name, stats[fn, lineno, name],
                   unit, stream=stream, human_readable=human_readable)
 
+
+def show_html(stats, unit, stream=None, human_readable=False):
+    """Output an html file.
+    """
+    if stream is None:
+        stream = sys.stdout
+
+    html_header = """<!doctype html>
+    <html>
+    <head>
+    <style type="text/css">
+    span.p0  {background-color: #FFFFFF}
+    span.p1  {background-color: #ffffa0}
+    span.p2  {background-color: #fff800}
+    span.p3  {background-color: #ffde00}
+    span.p4  {background-color: #ffbd00}
+    span.p5  {background-color: #ff9a00}
+    span.p6  {background-color: #ff7800}
+    span.p7  {background-color: #ff5700}
+    span.p8  {background-color: #ff3700}
+    span.p9  {background-color: #ff1d00}
+    span.p10 {background-color: #ff0000}
+    </style>
+    </head>
+    <body>
+    """
+    html_footer = """</body></html>"""
+    print >>stream, html_header
+
+    print >>stream, 'Timer unit: %g s' % unit
+    print >>stream, ''
+    for (fn, lineno, name), timings in sorted(stats.items()):
+        show_func_html(fn, lineno, name, stats[fn, lineno, name],
+                       unit, stream=stream, human_readable=human_readable)
+
+    print >>stream, html_footer
 
 # A %lprun magic for IPython.
 def magic_lprun(self, parameter_s=''):
@@ -348,12 +444,20 @@ def main():
     parser.add_option("--human-readable", "-H", dest="human_readable",
                       default=False, action="store_true",
                       help="print execution times in easy to read format")
+    parser.add_option("--output-html", "-m", dest="output_html",
+                      default=False, action="store_true",
+                      help="output results as an html file.")
     options, args = parser.parse_args()
     if len(args) != 1:
         parser.error("Must provide a filename.")
     lstats = load_stats(args[0])
-    show_text(lstats.timings, lstats.unit,
-              human_readable=options.human_readable)
+
+    if options.output_html:
+        show_html(lstats.timings, lstats.unit, open("%s.html" % args[0], "wb"),
+                  human_readable=options.human_readable)
+    else:
+        show_text(lstats.timings, lstats.unit,
+                  human_readable=options.human_readable)
 
 
 if __name__ == '__main__':
